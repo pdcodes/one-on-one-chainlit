@@ -10,5 +10,3 @@ python-dotenv==1.0.1
 langchain_openai
 langgraph
 langsmith
-langchain_openai
-langchain-community
