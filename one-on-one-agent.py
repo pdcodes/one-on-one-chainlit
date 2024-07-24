@@ -1,4 +1,4 @@
-# ---- IMPORTS ---- # 
+# ---- IMPORTS ---- #
 import os
 from dotenv import load_dotenv
 import chainlit as cl
@@ -16,10 +16,10 @@ from write_to_qdrant import write_to_qdrant
 
 load_dotenv()
 
-# ---- ENV VARIABLES ---- # 
+# ---- ENV VARIABLES ---- #
 HF_TOKEN = os.environ["HF_TOKEN"]
 QDRANT_API = os.environ["QDRANT_API_KEY"]
-OPENAI_API_KEY= os.environ["OPENAI_API_KEY"]
+OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_PROJECT"] = "One on One Agent - Huggingface"
 
@@ -28,21 +28,16 @@ from prompts import week_by_week_system_template
 from langchain_openai import ChatOpenAI
 from langchain.schema import SystemMessage
 
-chat_llm = ChatOpenAI(
-    model="gpt-4",
-    temperature=0.5,
-    streaming=True
-)
+chat_llm = ChatOpenAI(model="gpt-4", temperature=0.5, streaming=True)
 
 # Wrap the system prompt in a SystemMessage
 system_message = SystemMessage(content=week_by_week_system_template)
+
 
 # Create a function that prepends the system message to the messages in each call
 def chat_with_system(messages):
     return chat_llm([system_message] + messages)
 
-# Setup UpdateChecker tool
-# update_checker = UpdateChecker()
 
 # Setup state
 class AgentState(TypedDict):
@@ -53,6 +48,7 @@ class AgentState(TypedDict):
     next_question: Optional[str]
     category: Optional[str]
     user_email: Optional[str]  # Change from user_name to user_email!
+
 
 def categorize_input(human_input: str) -> Tuple[str, Optional[str]]:
     prompt = f"""
@@ -76,19 +72,20 @@ def categorize_input(human_input: str) -> Tuple[str, Optional[str]]:
     Email: [extracted email if category is "email", otherwise "None"]
     Week Time: [beginning/end if category is "week_time", otherwise "None"]
     """
-    
+
     response = chat_llm.invoke(prompt)
-    lines = response.content.strip().split('\n')
-    category = lines[0].split(': ')[1].lower()
-    name = lines[1].split(': ')[1]
-    week_time = lines[2].split(': ')[1]
-    
+    lines = response.content.strip().split("\n")
+    category = lines[0].split(": ")[1].lower()
+    name = lines[1].split(": ")[1]
+    week_time = lines[2].split(": ")[1]
+
     if category == "week_time":
         return category, week_time
     elif category == "email":
         return category, name if name != "None" else None
     else:
         return category, None
+
 
 def generate_summary(memory: ConversationBufferMemory) -> str:
     prompt = f"""
@@ -125,56 +122,56 @@ def generate_summary(memory: ConversationBufferMemory) -> str:
     
     Summary:
     """
-    
+
     summary = chat_llm.invoke(prompt)
     return summary.content
+
 
 def process_input(state: AgentState) -> AgentState:
     messages = state["messages"]
     memory = state["memory"]
     update_state = state["update_state"]
-    
+
     human_input = messages[-1].content if isinstance(messages[-1], HumanMessage) else ""
     state["last_human_message"] = human_input
     memory.chat_memory.add_user_message(human_input)
-    
+
     # We don't generate an AI response here anymore
     # The AI response will be handled in the check_update function
-    
+
     return {
         **state,
         "memory": memory,
         "update_state": update_state,
     }
 
+
 def check_update(state: AgentState) -> AgentState:
     update_state = state["update_state"]
     last_human_message = state["last_human_message"]
     memory = state["memory"]
-    
+
     # Use LLM to categorize the input
     category, detected_value = categorize_input(last_human_message)
-    
+
     # Update the update_state based on the LLM categorization
     if category in update_state:
         update_state[category] = True
-    
+
     # Handle email detection
-    if category == "email" and detected_value:
+    if category == "email" and detected_value and state["user_email"] == None:
         update_state["email"] = True
         state["user_email"] = detected_value
-    elif not update_state.get("email") and detected_value:
-        # If email was detected in another category of input
-        update_state["email"] = True
-        state["user_email"] = detected_value
-    
+
     # Handle week_time detection
     if category == "week_time":
         update_state["is_beginning_of_week"] = detected_value.lower() == "beginning"
-    
+
     # Generate AI response and follow-up question
-    chat_history = "\n".join([f"{m.type}: {m.content}" for m in memory.chat_memory.messages])
-    
+    chat_history = "\n".join(
+        [f"{m.type}: {m.content}" for m in memory.chat_memory.messages]
+    )
+
     # Define prompts for beginning and end of week
     beginning_of_week_prompt = """
     For the beginning of the week, focus on:
@@ -184,7 +181,7 @@ def check_update(state: AgentState) -> AgentState:
     4. Did anything really cool happen in the last week that the user would like to share or celebrate
     5. Make sure to collect the user's email
     """
-    
+
     end_of_week_prompt = """
     For the end of the week, focus on:
     1. Did the user finish the following tasks that they set out to do
@@ -192,12 +189,20 @@ def check_update(state: AgentState) -> AgentState:
     3. How do you feel this week went?
     4. Make sure to collect the user's email
     """
-    
-    week_specific_prompt = beginning_of_week_prompt if update_state["is_beginning_of_week"] else end_of_week_prompt
-    
+
+    week_specific_prompt = (
+        beginning_of_week_prompt
+        if update_state["is_beginning_of_week"]
+        else end_of_week_prompt
+    )
+
     # Determine missing information
-    missing_info = [key for key, value in update_state.items() if not value and key != "is_beginning_of_week"]
-    
+    missing_info = [
+        key
+        for key, value in update_state.items()
+        if not value and key != "is_beginning_of_week"
+    ]
+
     prompt = f"""
     Based on the following conversation and update state, generate a response to the user's last message and a direct question to gather missing information. The response should acknowledge the user's input and transition to the next question naturally but explicitly.
 
@@ -213,31 +218,42 @@ def check_update(state: AgentState) -> AgentState:
 
     Missing information: {', '.join(missing_info)}
 
-    Focus on gathering one piece of missing information at a time. Be direct but maintain a conversational tone. If all required information has been gathered, provide a concluding message.
-
-    Response and follow-up question:
+    Ask only one question at a time. You will be penalized if you try to ask more than one question. Be direct but maintain a conversational tone. If all required information has been gathered, provide a concluding message.
     """
-    
+
     response = chat_llm.invoke(prompt)
     ai_message = response.content
-    
+
     memory.chat_memory.add_ai_message(ai_message)
-    
+
     state["next_question"] = ai_message
     state["update_state"] = update_state
     state["memory"] = memory
     state["messages"] = state["messages"] + [AIMessage(content=ai_message)]
-    
+
     return state
+
 
 # Handle loop
 def should_continue(state: AgentState) -> Literal["continue", "end"]:
     update_state = state["update_state"]
-    required_fields = ["name", "project", "accomplishments", "blockers", "risks", "personal_updates"]
-    if all(update_state.get(field, False) for field in required_fields):
-        print("Reached end.")
+    required_fields = [
+        "is_beginning_of_week",
+        "email",
+        "project",
+        "accomplishments",
+        "blockers",
+        "risks",
+        "personal_updates",
+    ]
+    ## Ensure that all update state fields have been filled and that we also got the user's email
+    if (
+        all(update_state.get(field, False) for field in required_fields)
+        and state["user_email"] != None
+    ):
         return "end"
     return "continue"
+
 
 # Build graph
 workflow = StateGraph(AgentState)
@@ -255,10 +271,11 @@ workflow.add_conditional_edges(
     {
         "continue": END,  # We end here to wait for the next user input
         "end": END,
-    }
+    },
 )
 
 graph = workflow.compile()
+
 
 # Chainlit handlers
 @cl.on_chat_start
@@ -270,7 +287,7 @@ async def start():
         "accomplishments": False,
         "blockers": False,
         "risks": False,
-        "personal_updates": False
+        "personal_updates": False,
     }
     memory = ConversationBufferMemory(return_messages=True)
     cl.user_session.set("graph", graph)
@@ -278,11 +295,13 @@ async def start():
     cl.user_session.set("update_state", update_state)
     cl.user_session.set("category", None)
     cl.user_session.set("user_email", None)
-    
+
     await cl.Message(
         """Hello!
         I'm here to help you craft an update for your manager.
-        To get started, could you please tell me if this is for the beginning of the week or the end of the week? Please also provide your email address.""").send()
+        To get started, could you please tell me if this is for the beginning of the week or the end of the week?"""
+    ).send()
+
 
 @cl.on_message
 async def on_message(message: cl.Message):
@@ -290,39 +309,39 @@ async def on_message(message: cl.Message):
     memory = cl.user_session.get("memory")
     update_state = cl.user_session.get("update_state")
     category = cl.user_session.get("category")
-    user_email = cl.user_session.get("user_email")  # Change from "user_name" to "user_email"
+    user_email = cl.user_session.get("user_email")
 
-    print(category)
-    print(user_email)
-    
-    result = graph.invoke({
-        "messages": [HumanMessage(content=message.content)],
-        "memory": memory,
-        "update_state": update_state,
-        "last_human_message": message.content,
-        "next_question": None,
-        "category": category,
-        "user_email": user_email,  # Change from "user_name" to "user_email"
-    })
+    result = graph.invoke(
+        {
+            "messages": [HumanMessage(content=message.content)],
+            "memory": memory,
+            "update_state": update_state,
+            "last_human_message": message.content,
+            "next_question": None,
+            "category": category,
+            "user_email": user_email,
+        }
+    )
 
-    print(f"Result: \n", result)
-    
     if should_continue(result) == "end":
-        print("We hit end.")
         summary = generate_summary(memory)
-        await cl.Message(f"Great! We've completed your update. Here's a summary of what we've discussed:\n\n{summary}\n\nWe'll go ahead and save this update for your manager.").send()
-        
+        await cl.Message(
+            f"Great! We've completed your update. Here's a summary of what we've discussed:\n\n{summary}\n\nWe'll go ahead and save this update for your manager."
+        ).send()
+
         # Save to Qdrant
-        user_email = result["user_email"]  # Change from "user_name" to "user_email"
-        result = write_to_qdrant(user_email, summary)  # Change from user_name to user_email
+        user_email = result["user_email"]
+        result = write_to_qdrant(user_email, summary)
 
     elif isinstance(result, dict):
         if result["next_question"]:
             await cl.Message(content=result["next_question"]).send()
-        
+
         cl.user_session.set("memory", result["memory"])
         cl.user_session.set("update_state", result["update_state"])
         cl.user_session.set("category", result.get("category"))
-        cl.user_session.set("user_name", result.get("user_name"))
+        cl.user_session.set("user_email", result.get("user_email"))
     else:
-        await cl.Message("I'm sorry, but I encountered an unexpected error. Could you please try again?").send()
+        await cl.Message(
+            "I'm sorry, but I encountered an unexpected error. Could you please try again?"
+        ).send()
