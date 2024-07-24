@@ -17,11 +17,11 @@ from write_to_qdrant import write_to_qdrant
 load_dotenv()
 
 # ---- ENV VARIABLES ---- # 
-# HF_TOKEN = os.environ["HF_TOKEN"]
+HF_TOKEN = os.environ["HF_TOKEN"]
 QDRANT_API = os.environ["QDRANT_API_KEY"]
 OPENAI_API_KEY= os.environ["OPENAI_API_KEY"]
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
-os.environ["LANGCHAIN_PROJECT"] = "One on One Agent"
+os.environ["LANGCHAIN_PROJECT"] = "One on One Agent - Huggingface"
 
 # Setup Chat LLM
 from prompts import week_by_week_system_template
