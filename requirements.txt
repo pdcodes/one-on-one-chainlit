@@ -11,3 +11,4 @@ langchain_openai
 langgraph
 langsmith
 uvicorn[standard]
+python-socketio==5.11.2
