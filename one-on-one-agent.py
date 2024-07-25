@@ -238,7 +238,6 @@ def check_update(state: AgentState) -> AgentState:
 def should_continue(state: AgentState) -> Literal["continue", "end"]:
     update_state = state["update_state"]
     required_fields = [
-        "is_beginning_of_week",
         "email",
         "project",
         "accomplishments",
