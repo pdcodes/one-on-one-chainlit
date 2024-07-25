@@ -323,6 +323,8 @@ async def on_message(message: cl.Message):
         }
     )
 
+    print("result: \n", result)
+
     if should_continue(result) == "end":
         summary = generate_summary(memory)
         await cl.Message(
