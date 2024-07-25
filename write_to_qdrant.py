@@ -5,6 +5,7 @@ To Do:
 - Chunk and embed the update content
 - Write to Qdrant with appropriate metadata
 """
+
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from langchain_community.embeddings import OpenAIEmbeddings
@@ -17,12 +18,10 @@ QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY")
 
 # project: str,
 
+
 def write_to_qdrant(user_email: str, update_content: str):
     # Initialize Qdrant client
-    client = QdrantClient(
-        url=QDRANT_URL,
-        api_key=QDRANT_API_KEY
-    )
+    client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 
     # Initialize OpenAI embeddings
     # embeddings = OpenAIEmbeddings()
@@ -30,17 +29,20 @@ def write_to_qdrant(user_email: str, update_content: str):
 
     # Generate embeddings for the update content
     # vector = embedding_model.embed_query(update_content)
-    vectorstore = Qdrant(client, collection_name="one-on-ones", embeddings=embedding_model)
+    vectorstore = Qdrant(
+        client, collection_name="one-on-ones", embeddings=embedding_model
+    )
 
     # Create metadata
-    metadata = [{
-        "user": user_email,
-        # "project": project,
-        "date": datetime.now().strftime("%Y-%U")
-    }]
-    
-    vectorstore.add_texts([update_content], metadatas=metadata)
+    metadata = [
+        {
+            "user": user_email,
+            # "project": project,
+            "week": datetime.now().strftime("%Y-%U"),
+        }
+    ]
 
+    vectorstore.add_texts([update_content], metadatas=metadata)
 
     """
 
